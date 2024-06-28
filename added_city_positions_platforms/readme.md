@@ -1,0 +1,6 @@
+- No action masking 
+- PsPPO 
+- Tree Observations 
+- with stations and cities 
+- random city positions 
+- Run ps_ppo_main.py
