@@ -24,16 +24,19 @@ def fast_grid4_get_transition(cell_transition, orientation, direction):
 @lru_cache(maxsize=128)
 def fast_grid4_set_transitions(cell_transition, orientation, new_transitions):
     mask = (1 << ((4 - orientation) * 4)) - (1 << ((3 - orientation) * 4))
-    negmask = ~mask
-
+    negmask = int(~mask)
+    
     new_transitions = \
         (new_transitions[0] & 1) << 3 | \
         (new_transitions[1] & 1) << 2 | \
         (new_transitions[2] & 1) << 1 | \
         (new_transitions[3] & 1)
-
-    cell_transition = (cell_transition & negmask) | (new_transitions << ((3 - orientation) * 4))
-
+    print(mask,negmask,cell_transition)
+    try : 
+    
+        cell_transition = (cell_transition & negmask) | (new_transitions << ((3 - orientation) * 4))
+    except:
+        cell_transition =int('1100110000110011', 2)
     return cell_transition
 
 

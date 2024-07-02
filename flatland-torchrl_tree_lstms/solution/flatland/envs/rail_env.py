@@ -334,8 +334,9 @@ class RailEnv(Environment):
 
             for agent_i, agent in enumerate(self.agents):
                 agent.earliest_departure = timetable.earliest_departures[agent_i]
+                
                 agent.latest_arrival = timetable.latest_arrivals[agent_i]
-        else:
+                
             self.distance_map.reset(self.agents, self.rail)
 
         # Reset agents to initial states

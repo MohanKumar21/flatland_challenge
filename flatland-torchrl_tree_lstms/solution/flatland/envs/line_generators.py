@@ -42,10 +42,11 @@ def speed_initialization_helper(nb_agents: int, speed_ratio_map: Mapping[float, 
 
 
 class BaseLineGen(object):
-    def __init__(self, speed_ratio_map: Mapping[float, float] = None, seed: int = 1):
+    def __init__(self, speed_ratio_map: Mapping[float, float] = None, seed: int = 1,agent_positions=None,agent_targets=None):
         self.speed_ratio_map = speed_ratio_map
         self.seed = seed
-
+        self.agent_positions=agent_positions 
+        self.agent_targets=agent_targets
     def generate(self, rail: GridTransitionMap, num_agents: int, hints: Any=None, num_resets: int = 0,
         np_random: RandomState = None) -> Line:
         pass
@@ -54,8 +55,8 @@ class BaseLineGen(object):
         return self.generate(*args, **kwargs)
 
 
-def sparse_line_generator(speed_ratio_map: Mapping[float, float] = None, seed: int = 1) -> LineGenerator:
-    return SparseLineGen(speed_ratio_map, seed)
+def sparse_line_generator(speed_ratio_map: Mapping[float, float] = None, seed: int = 1,agent_positions=None,agent_targets=None) -> LineGenerator:
+    return SparseLineGen(speed_ratio_map, seed,agent_positions,agent_targets)
 
 
 class SparseLineGen(BaseLineGen):
@@ -149,7 +150,10 @@ class SparseLineGen(BaseLineGen):
             agents_target.append((agent_target[0][0], agent_target[0][1]))
             agents_direction.append(agent_orientation)
 
-
+        if self.agent_positions is not None:
+            agents_position=self.agent_positions 
+        if self.agent_targets is not None:
+            agents_target=agents_target 
         if self.speed_ratio_map:
             speeds = speed_initialization_helper(num_agents, self.speed_ratio_map, seed=_runtime_seed, np_random=np_random)
         else:

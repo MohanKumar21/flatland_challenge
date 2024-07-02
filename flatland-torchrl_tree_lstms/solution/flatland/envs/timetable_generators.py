@@ -83,14 +83,17 @@ def timetable_generator(agents: List[EnvAgent], distance_map: DistanceMap,
         
         departure_window_max = max(latest_arrival_max - agent_travel_time_max, 1)
         
-        earliest_departure = np_random.randint(0, departure_window_max)
-        latest_arrival = earliest_departure + agent_travel_time_max
+        # earliest_departure = np_random.randint(0, departure_window_max)
+        # latest_arrival = earliest_departure + agent_travel_time_max
+        earliest_departure = 0
+        latest_arrival = max_episode_steps
         
         earliest_departures.append(earliest_departure)
         latest_arrivals.append(latest_arrival)
 
         agent.earliest_departure = earliest_departure
         agent.latest_arrival = latest_arrival
+       
 
     return Timetable(earliest_departures=earliest_departures, latest_arrivals=latest_arrivals,
                     max_episode_steps=max_episode_steps)

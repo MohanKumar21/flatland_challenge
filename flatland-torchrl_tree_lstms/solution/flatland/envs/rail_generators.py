@@ -144,7 +144,7 @@ class SparseRailGen(RailGen):
         self.max_rail_pairs_in_city = max_rail_pairs_in_city
         self.seed = seed
         self.city_positions=city_positions
-        self.platforms=platforms
+        # self.platforms=platforms
     
 
     def generate(self, width: int, height: int, num_agents: int, num_resets: int = 0,
@@ -172,7 +172,6 @@ class SparseRailGen(RailGen):
             'train_stations': locations of train stations for start and targets
             'city_orientations' : orientation of cities
         """
-        print("asdASDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSDSD")
         if self.seed is not None:
             np_random = RandomState(self.seed)
         elif np_random is None:
@@ -190,9 +189,10 @@ class SparseRailGen(RailGen):
         # We compute the city radius by the given max number of rails it can contain.
         # The radius is equal to the number of tracks divided by 2
         # We add 2 cells to avoid that track lenght is to short
-        city_padding = 2
+        city_padding = 1
         # We use ceil if we get uneven numbers of city radius. This is to guarantee that all rails fit within the city.
         city_radius = int(np.ceil((rail_pairs_in_city * 2) / 2)) + city_padding
+        city_radius=2
         vector_field = np.zeros(shape=(height, width)) - 1.
 
         # Calculate the max number of cities allowed
@@ -244,6 +244,9 @@ class SparseRailGen(RailGen):
 
         # Fix all transition elements
         self._fix_transitions(city_cells, inter_city_lines, grid_map, vector_field)
+
+        # self._add_junctions(self.city_positions,[],city_cells,
+        #                                         rail_trans, grid_map)
         self.grid_map=grid_map
         return grid_map, {'agents_hints': {
             'city_positions': city_positions,
@@ -272,7 +275,7 @@ class SparseRailGen(RailGen):
 
         Returns
         -------
-        Returns a list of all city positions as coordinates (x,y)
+        Returns a list of all city positions as coordinates ([x,y])
 
         """
 
@@ -302,9 +305,9 @@ class SparseRailGen(RailGen):
 
             # Need to block city radius and extra margin so that next sampling is correct
             # Clipping handles the case for negative indexes being generated
-            if self.platforms is not None:
-                city_radius_pad1=max(city_radius_pad1,self.platforms[_]+2)
-            self.city_radiuses[_]=city_radius_pad1
+            # if self.platforms is not None:
+            #     city_radius_pad1=max(city_radius_pad1,self.platforms[_]+2)
+            self.city_radiuses[_]=1
             # print(self.city_radiuses)
             row_start = max(0, row - 2 * city_radius_pad1)
             col_start = max(0, col - 2 * city_radius_pad1)
@@ -340,7 +343,7 @@ class SparseRailGen(RailGen):
 
         Returns
         -------
-        Returns a list of all city positions as coordinates (x,y)
+        Returns a list of all city positions as coordinates ([x,y])
 
         """
         aspect_ratio = height / width
@@ -434,13 +437,13 @@ class SparseRailGen(RailGen):
             city_orientations.append(current_closest_direction)
             city_cells.extend(self._get_cells_in_city(city_position, city_radius, city_orientations[-1], vector_field))
             # set the number of tracks within a city, at least 2 tracks per city
-           
+            print(city_radius,city_position)
             connections_per_direction = np.zeros(4, dtype=int)
             # NEW : SCHED CONST
             # rostoki changes for rail pairs
             # rail_pairs_in_city=self.platforms[i]
             nr_of_connection_points = np_random.randint(1, rail_pairs_in_city + 1) * 2  # can be (1,2,3)*2 = (2,4,6)
-            nr_of_connection_points=5
+            # nr_of_connection_points=5
             for idx in connection_sides_idx:
 
                 connections_per_direction[idx] = nr_of_connection_points
@@ -485,11 +488,39 @@ class SparseRailGen(RailGen):
                     connection_points_coordinates_inner[direction].append(tmp_coordinates)
                     if connection_idx in range(start_idx, start_idx + number_of_out_rails):
                         connection_points_coordinates_outer[direction].append(out_tmp_coordinates)
+            connection_points_coordinates_outer: List[List[IntVector2D]] = [[] for i in range(4)]
+
+            connection_points_coordinates_inner: List[List[IntVector2D]] = [[] for i in range(4)]
+            if current_closest_direction==2 or current_closest_direction==1:
+                for i in range(-1,2):
+                    temp_coordinates=list(city_position)
+                    temp_coordinates[0]+=i
+                    temp_coordinates[1]+=3 
+                    connection_points_coordinates_outer[direction].append(tuple(temp_coordinates))
+                    connection_points_coordinates_inner[direction].append(tuple(temp_coordinates))
+                    temp_coordinates[1]-=6 
+                    connection_points_coordinates_outer[(direction+2)%4].append(tuple(temp_coordinates))
+                    connection_points_coordinates_inner[(direction+2)%4].append(tuple(temp_coordinates))
+            else:
+                for i in range(-1,2):
+                    temp_coordinates=list(city_position)
+                    temp_coordinates[1]+=i
+                    temp_coordinates[0]+=3 
+                    connection_points_coordinates_outer[direction].append(tuple(temp_coordinates))
+                    connection_points_coordinates_inner[direction].append(tuple(temp_coordinates))
+                    temp_coordinates[0]-=6 
+                    connection_points_coordinates_outer[(direction+2)%4].append(tuple(temp_coordinates))
+                    connection_points_coordinates_inner[(direction+2)%4].append(tuple(temp_coordinates))
+
+
+
 
             inner_connection_points.append(connection_points_coordinates_inner)
             outer_connection_points.append(connection_points_coordinates_outer)
         # print(inner_connection_points, outer_connection_points, city_orientations, city_cells)
         # print(inner_connection_points)
+        self.city_orientations=city_orientations
+        print(outer_connection_points,"outer connection_points")
         return inner_connection_points, outer_connection_points, city_orientations, city_cells
 
     def _connect_cities(self, city_positions: IntVector2DArray, connection_points: List[List[List[IntVector2D]]],
@@ -520,39 +551,38 @@ class SparseRailGen(RailGen):
         """
         all_paths: List[IntVector2DArray] = []
         # Rostoki 
-        connection_points=[[[] for j in range(4)] for i in range(len(city_positions))]
+        # connection_points=[[[] for j in range(4)] for i in range(len(city_positions))]
         
 
-        for current_city in range(len(city_positions)):
+        # for current_city in range(len(city_positions)):
 
 
-            # Rostoki 
-            neighb_dist = []
-            for neighbour_city in city_positions:
-                neighb_dist.append(Vec2dOperations.get_manhattan_distance(city_positions[current_city], neighbour_city))
-            closest_neighb_idx = self.__class__.argsort(neighb_dist)
-            idx = 1
+        #     # Rostoki 
+        #     neighb_dist = []
+        #     for neighbour_city in city_positions:
+        #         neighb_dist.append(Vec2dOperations.get_manhattan_distance(city_positions[current_city], neighbour_city))
+        #     closest_neighb_idx = self.__class__.argsort(neighb_dist)
+        #     idx = 1
             
-            current_closest_direction = direction_to_point(city_positions[current_city], city_positions[closest_neighb_idx[idx]])
+        #     current_closest_direction = direction_to_point(city_positions[current_city], city_positions[closest_neighb_idx[idx]])
 
-            if current_closest_direction==1 or current_closest_direction==3:
+        #     if current_closest_direction==1 or current_closest_direction==3:
                 
                 
-                connection_points[current_city][current_closest_direction].append((city_positions[current_city][0],city_positions[current_city][1]-4))
-                connection_points[current_city][(current_closest_direction+2)%4].append((city_positions[current_city][0],city_positions[current_city][1]+4))
-                connection_points[current_city][(current_closest_direction+2)%4].append((city_positions[current_city][0],city_positions[current_city][1]-4))
-                connection_points[current_city][current_closest_direction].append((city_positions[current_city][0],city_positions[current_city][1]+4))
-            else:
-                connection_points[current_city][current_closest_direction].append((city_positions[current_city][0]-4,city_positions[current_city][1]))
-                connection_points[current_city][(current_closest_direction+2)%4].append((city_positions[current_city][0]+4,city_positions[current_city][1]))
-                connection_points[current_city][(current_closest_direction+2)%4].append((city_positions[current_city][0]-4,city_positions[current_city][1]))
-                connection_points[current_city][current_closest_direction].append((city_positions[current_city][0]+4,city_positions[current_city][1]))
+        #         connection_points[current_city][current_closest_direction].append((city_positions[current_city][0],city_positions[current_city][1]-4))
+        #         connection_points[current_city][(current_closest_direction+2)%4].append((city_positions[current_city][0],city_positions[current_city][1]+4))
+        #         connection_points[current_city][(current_closest_direction+2)%4].append((city_positions[current_city][0],city_positions[current_city][1]-4))
+        #         connection_points[current_city][current_closest_direction].append((city_positions[current_city][0],city_positions[current_city][1]+4))
+        #     else:
+        #         connection_points[current_city][current_closest_direction].append((city_positions[current_city][0]-4,city_positions[current_city][1]))
+        #         connection_points[current_city][(current_closest_direction+2)%4].append((city_positions[current_city][0]+4,city_positions[current_city][1]))
+        #         connection_points[current_city][(current_closest_direction+2)%4].append((city_positions[current_city][0]-4,city_positions[current_city][1]))
+        #         connection_points[current_city][current_closest_direction].append((city_positions[current_city][0]+4,city_positions[current_city][1]))
         
         # print(connection_points,"connection_points")
 
         self.connection_points=connection_points
-
-
+        print(connection_points)
         grid4_directions = [Grid4TransitionsEnum.NORTH, Grid4TransitionsEnum.EAST, Grid4TransitionsEnum.SOUTH,
                             Grid4TransitionsEnum.WEST]
         for current_city_idx in np.arange(len(city_positions)):
@@ -572,11 +602,17 @@ class SparseRailGen(RailGen):
                             if tmp_dist < min_connection_dist:
                                 min_connection_dist = tmp_dist
                                 neighbour_connection_point = tmp_in_connection_point
-                    new_line = connect_rail_in_grid_map(grid_map, city_out_connection_point, neighbour_connection_point,
-                                                        rail_trans, flip_start_node_trans=False,
-                                                        flip_end_node_trans=False, respect_transition_validity=False,
-                                                        avoid_rail=True,
-                                                        forbidden_cells=city_cells)
+
+                            # rostoki 
+                            neighbour_connection_point=tmp_in_connection_point
+                            new_line = connect_rail_in_grid_map(grid_map, city_out_connection_point, neighbour_connection_point,
+                                                                rail_trans, flip_start_node_trans=False,
+                                                                flip_end_node_trans=False, respect_transition_validity=False,
+                                                                avoid_rail=True,
+                                                                forbidden_cells=city_cells)
+                    if city_out_connection_point in city_cells or neighbour_connection_point in city_cells:
+                        print("YES Forbidded")
+                         
                     if len(new_line) == 0:
                         warnings.warn("[WARNING] No line added between stations")
                     elif new_line[-1] != neighbour_connection_point or new_line[0] != city_out_connection_point:
@@ -588,7 +624,7 @@ class SparseRailGen(RailGen):
         # plt.xlim(0,70)
         # plt.ylim(0,70)   
         # print(all_paths)
-        
+        print(city_cells)
         return all_paths
 
     def get_closest_neighbour_for_direction(self, closest_neighbours, out_direction):
@@ -664,46 +700,41 @@ class SparseRailGen(RailGen):
         free_rails: List[List[List[IntVector2D]]] = [[] for i in range(len(city_positions))]
         # Rostoki 
 
-        inner_connection_points=[[[] for j in range(4)] for i in range(len(city_positions))]
+        # inner_connection_points=[[[] for j in range(4)] for i in range(len(city_positions))]
         
 
-        for current_city in range(len(city_positions)):
+        # for current_city in range(len(city_positions)):
 
 
-            # Rostoki 
-            neighb_dist = []
-            for neighbour_city in city_positions:
-                neighb_dist.append(Vec2dOperations.get_manhattan_distance(city_positions[current_city], neighbour_city))
-            closest_neighb_idx = self.__class__.argsort(neighb_dist)
-            # print(closest_neighb_idx)
-            # Store the directions to these neighbours and orient city to face closest neighbour
-            connection_sides_idx = []
-            idx = 1
+        #     # Rostoki 
+        #     neighb_dist = []
+        #     for neighbour_city in city_positions:
+        #         neighb_dist.append(Vec2dOperations.get_manhattan_distance(city_positions[current_city], neighbour_city))
+        #     closest_neighb_idx = self.__class__.argsort(neighb_dist)
+        #     # print(closest_neighb_idx)
+        #     # Store the directions to these neighbours and orient city to face closest neighbour
+        #     connection_sides_idx = []
+        #     idx = 1 
             
-            current_closest_direction = direction_to_point(city_positions[current_city], city_positions[closest_neighb_idx[idx]])
+        #     current_closest_direction = direction_to_point(city_positions[current_city], city_positions[closest_neighb_idx[idx]])
 
-            if current_closest_direction==1 or current_closest_direction==3:
-                number_of_platforms=self.platforms[current_city]
-                for width in range(-number_of_platforms//2,number_of_platforms//2+1):
-                    inner_connection_points[current_city][current_closest_direction].append((city_positions[current_city][0]+width,city_positions[current_city][1]-3))
-                    inner_connection_points[current_city][(current_closest_direction+2)%4].append((city_positions[current_city][0]+width,city_positions[current_city][1]+3))
-            else:
+        #     if current_closest_direction==1 or current_closest_direction==3:
+        #         number_of_platforms=0
+        #         for width in range(-number_of_platforms//2,number_of_platforms//2+1):
+        #             inner_connection_points[current_city][current_closest_direction].append((city_positions[current_city][0]+width,city_positions[current_city][1]-1))
+        #             inner_connection_points[current_city][(current_closest_direction+2)%4].append((city_positions[current_city][0]+width,city_positions[current_city][1]+1))
+        #     else:
                 
-                number_of_platforms=self.platforms[current_city]
-                for width in range(-number_of_platforms//2,number_of_platforms//2+1):
-                    inner_connection_points[current_city][current_closest_direction].append((city_positions[current_city][0]-3,city_positions[current_city][1]+width))
-                    inner_connection_points[current_city][(current_closest_direction+2)%4].append((city_positions[current_city][0]+3,city_positions[current_city][1]+width))
-        # print(inner_connection_points,"inner connection points")
-        outer_connection_points=self.connection_points
+        #         number_of_platforms=0
+        #         for width in range(-number_of_platforms//2,number_of_platforms//2+1):
+        #             inner_connection_points[current_city][current_closest_direction].append((city_positions[current_city][0]-1,city_positions[current_city][1]+width))
+        #             inner_connection_points[current_city][(current_closest_direction+2)%4].append((city_positions[current_city][0]+1,city_positions[current_city][1]+width))
+        # # print(inner_connection_points,"inner connection points")
+        # outer_connection_points=self.connection_points
         for current_city in range(len(city_positions)):
 
 
             # Rostoki 
-            
-            
-            
-            
-            
             
             # This part only works if we have keep same number of connection points for both directions
             # Also only works with two connection direction at each city
@@ -719,6 +750,7 @@ class SparseRailGen(RailGen):
             
             # Connect parallel tracks
             for track_id in range(nr_of_connection_points):
+                
                 source = inner_connection_points[current_city][boarder][track_id]
                 target = inner_connection_points[current_city][opposite_boarder][track_id]
                 current_track = connect_straight_line_in_grid_map(grid_map, source, target, rail_trans)
@@ -733,17 +765,22 @@ class SparseRailGen(RailGen):
                 target = inner_connection_points[current_city][opposite_boarder][track_id]
 
                 # Connect parallel tracks with each other
-                # fix_inner_nodes(
-                #     grid_map, source, rail_trans)
-                # fix_inner_nodes(
-                #     grid_map, target, rail_trans)
+                fix_inner_nodes(
+                    grid_map, source, rail_trans)
+                fix_inner_nodes(
+                    grid_map, target, rail_trans)
 
                 # Connect outer tracks to inner tracks
-                if start_idx <= track_id < start_idx + number_of_out_rails:
-                    source_outer = outer_connection_points[current_city][boarder][track_id - start_idx]
-                    target_outer = outer_connection_points[current_city][opposite_boarder][track_id - start_idx]
-                    connect_straight_line_in_grid_map(grid_map, source, source_outer, rail_trans)
-                    connect_straight_line_in_grid_map(grid_map, target, target_outer, rail_trans)
+                # if start_idx <= track_id < start_idx + number_of_out_rails:
+                #     source_outer = outer_connection_points[current_city][boarder][track_id - start_idx]
+                #     target_outer = outer_connection_points[current_city][opposite_boarder][track_id - start_idx]
+                #     connect_straight_line_in_grid_map(grid_map, source, source_outer, rail_trans)
+                #     connect_straight_line_in_grid_map(grid_map, target, target_outer, rail_trans)
+                
+                source_outer = outer_connection_points[current_city][boarder][track_id - start_idx]
+                target_outer = outer_connection_points[current_city][opposite_boarder][track_id - start_idx]
+                connect_straight_line_in_grid_map(grid_map, source, source_outer, rail_trans)
+                connect_straight_line_in_grid_map(grid_map, target, target_outer, rail_trans)
         return free_rails
 
     def _set_trainstation_positions(self, city_positions: IntVector2DArray, city_radius: int,
@@ -811,6 +848,143 @@ class SparseRailGen(RailGen):
         # Fix all other cells
         for cell in range(rails_to_fix_cnt):
             grid_map.fix_transitions((rails_to_fix[3 * cell], rails_to_fix[3 * cell + 1]), rails_to_fix[3 * cell + 2])
+
+
+
+    def _add_junctions(self, city_positions: IntVector2DArray, connection_points: List[List[List[IntVector2D]]],
+                        city_cells: IntVector2DArray,
+                        rail_trans: RailEnvTransitions, grid_map: RailEnvTransitions):
+        '''
+        Adds junctions to the grid map randomly.Distribution 50-20-20-10  
+        '''
+        print(city_positions)
+        city_positions=np.array(city_positions)
+        n = len(city_positions)
+        ratios = [0.5, 0.2, 0.1, 0.1]
+        # Ensure the ratios sum to 1
+        ratios = np.array(ratios)
+        ratios /= ratios.sum()
+
+        # Calculate the number of positions for each part
+        sizes = (ratios * n).astype(int)
+
+        # Ensure that the total number of samples matches the original size
+        sizes[-1] += n - sizes.sum()
+        from collections import defaultdict
+        # Generate a shuffled array of indices
+        indices = np.arange(n)
+        np.random.shuffle(indices)
+        print(sizes,indices[:sizes[0]])
+        # Split the indices into the parts
+        part1 = city_positions[indices[:sizes[0]]]
+        part2 = city_positions[indices[sizes[0]:sizes[0] + sizes[1]]]
+        part3 = city_positions[indices[sizes[0] + sizes[1]:sizes[0] + sizes[1] + sizes[2]]]
+        part4 = city_positions[indices[sizes[0] + sizes[1] + sizes[2]:]]
+
+        dict=defaultdict()
+        positions=[]
+        print(self.city_orientations)
+        for i in range(len(city_positions)):
+            print(city_positions[i],self.city_orientations[i])
+            dict[tuple(city_positions[i])]=int(self.city_orientations[i])
+        
+        for i in range(len(part1)): 
+            city=tuple(part1[i])
+            if dict[city]==1 or dict[city]==3:
+                for i in range(-2,2):
+                    x=city_positions[i][0]-1 
+                    y=city_positions[i][1]+i
+                    fix_inner_nodes(grid_map,tuple([x,y]),rail_trans)
+                    connect_straight_line_in_grid_map(grid_map,tuple([x,y]),tuple([x+2,y]),rail_trans)
+                    positions.append(([x,y]))
+                    positions.append(([x+2,y]))
+            else:
+
+                for i in range(-2,2):
+                        x=city_positions[i][0]+i 
+                        y=city_positions[i][1]-1
+                        print(x,y,city_positions[i])
+                        fix_inner_nodes(grid_map,tuple([x,y]),rail_trans)
+                        connect_straight_line_in_grid_map(grid_map,tuple([x,y]),tuple([x,y+2]),rail_trans)
+                        positions.append(([x,y]))
+                        positions.append(([x,y+2]))
+        for i in range(len(part2)): 
+            city=tuple(part2[i])
+            if dict[city]==1 or dict[city]==3:
+                for i in range(-1,2):
+                    x=city_positions[i][0]-1 
+                    y=city_positions[i][1]+i
+                    fix_inner_nodes(grid_map,tuple([x,y]),rail_trans)
+                    connect_straight_line_in_grid_map(grid_map,tuple([x,y]),tuple([x+2,y]),rail_trans)
+                    positions.append(([x,y]))
+                    positions.append(([x+2,y]))
+            else:
+
+                for i in range(-1,2):
+                        x=city_positions[i][0]+i 
+                        y=city_positions[i][1]-1
+                        fix_inner_nodes(grid_map,tuple([x,y]),rail_trans)
+                        connect_straight_line_in_grid_map(grid_map,tuple([x,y]),tuple([x,y+2]),rail_trans)
+                        positions.append(([x,y]))
+                        positions.append(([x,y+2]))
+
+        for i in range(len(part3)): 
+                city=tuple(part3[i])
+                if dict[city]==1 or dict[city]==3:
+                    for i in range(-1,1):
+                        x=city_positions[i][0]-1 
+                        y=city_positions[i][1]+i
+                        fix_inner_nodes(grid_map,tuple([x,y]),rail_trans)
+                        connect_straight_line_in_grid_map(grid_map,tuple([x,y]),tuple([x+2,y]),rail_trans)
+                        positions.append(([x,y]))
+                        positions.append(([x+2,y]))
+                else:
+
+                    for i in range(-1,1):
+                            x=city_positions[i][0]+i 
+                            y=city_positions[i][1]-1
+                            fix_inner_nodes(grid_map,tuple([x,y]),rail_trans)
+                            connect_straight_line_in_grid_map(grid_map,tuple([x,y]),tuple([x,y+2]),rail_trans)
+                            positions.append(([x,y]))
+                            positions.append(([x,y+2]))
+
+        for i in range(len(part4)): 
+            city=tuple(part4[i])
+            if dict[city]==1 or dict[city]==3:
+                for i in range(0,1):
+                    x=city_positions[i][0]-1 
+                    y=city_positions[i][1]+i
+                    fix_inner_nodes(grid_map,tuple([x,y]),rail_trans)
+                    connect_straight_line_in_grid_map(grid_map,tuple([x,y]),tuple([x+2,y]),rail_trans)
+                    positions.append(([x,y]))
+                    positions.append(([x+2,y]))
+            else:
+
+                for i in range(0,1):
+                        x=city_positions[i][0]+i 
+                        y=city_positions[i][1]-1
+                        fix_inner_nodes(grid_map,tuple([x,y]),rail_trans)
+                        connect_straight_line_in_grid_map(grid_map,tuple([x,y]),tuple([x,y+2]),rail_trans)
+                        positions.append(([x,y]))
+                        positions.append(([x,y+2]))
+
+        # print(positions)
+            
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     def _closest_neighbour_in_grid4_directions(self, current_city_idx: int, city_positions: IntVector2DArray) -> List[
         int]:
