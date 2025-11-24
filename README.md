@@ -19,7 +19,6 @@ The key innovation is using Tree-structured LSTMs to process hierarchical observ
 
 ## The Flatland Environment
 
-![Flatland Scene](assets/images/FL-1.png)
 
 Flatland is a 2D grid-based railway simulation environment developed for the NeurIPS 2020 competition. It provides a realistic testbed for multi-agent reinforcement learning algorithms by simulating complex railway network dynamics.
 
@@ -311,7 +310,6 @@ Classical Operations Research approaches were implemented to establish performan
 
 ## Indian Railways Network Integration
 
-![Indian Railways](assets/images/FL-4.png)
 
 To validate the practical applicability of the developed approaches, I integrated real-world railway network data from Indian Railways, specifically focusing on the Tamil Nadu region.
 
